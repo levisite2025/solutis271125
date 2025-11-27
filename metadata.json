@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Copy of IndoorDisplay Pro",
+  "description": "A professional digital signage management system with offline capabilities, scheduling, and AI-powered content generation.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
