@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import Player from './components/Player';
@@ -19,11 +20,13 @@ const App: React.FC = () => {
   };
 
   // Inicializa o estado verificando a URL e carregando dados do Storage imediatamente
-  // Isso previne o "flash" de tela preta ou estado inicial incorreto
   const initializeState = () => {
      const hash = window.location.hash;
      const params = new URLSearchParams(window.location.search);
      const terminalId = params.get('terminalId');
+     
+     // Se tem terminalId, ativamos o modo Kiosk (isolado)
+     const isKiosk = !!terminalId; 
 
      // Se estiver na rota #player (via link ou refresh)
      if (hash === '#player') {
@@ -47,14 +50,16 @@ const App: React.FC = () => {
          return {
              mode: 'player' as const,
              activePlaylist: targetPlaylist || null,
-             activeIntegrations: integrations
+             activeIntegrations: integrations,
+             isKiosk: isKiosk
          };
      }
 
      return {
          mode: 'dashboard' as const,
          activePlaylist: null,
-         activeIntegrations: []
+         activeIntegrations: [],
+         isKiosk: false
      };
   };
 
@@ -77,18 +82,23 @@ const App: React.FC = () => {
     setState({
         mode: 'player',
         activePlaylist: playlist,
-        activeIntegrations: integrations
+        activeIntegrations: integrations,
+        isKiosk: false // Iniciado pelo painel, permite sair
     });
     setMode('player');
     window.location.hash = 'player';
   };
 
   const exitPlayer = () => {
+    // Segurança extra: Kiosk não pode sair via botão (mesmo se o botão estivesse visível)
+    if (state.isKiosk) return; 
+
     setMode('dashboard');
     setState({
         mode: 'dashboard',
         activePlaylist: null,
-        activeIntegrations: []
+        activeIntegrations: [],
+        isKiosk: false
     });
     // Limpa a URL
     const url = new URL(window.location.href);
@@ -102,11 +112,23 @@ const App: React.FC = () => {
       return (
         <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
           <div className="text-center p-8 bg-gray-800 rounded-xl shadow-2xl border border-red-500/30">
-             <h1 className="text-2xl font-bold mb-4 text-red-400">Erro de Carregamento</h1>
-             <p className="mb-6 text-gray-400">Não foi possível carregar a playlist. Verifique as configurações.</p>
-             <button onClick={exitPlayer} className="bg-blue-600 px-6 py-2 rounded hover:bg-blue-500 transition-colors">
-               Voltar ao Painel
-             </button>
+             <h1 className="text-2xl font-bold mb-4 text-red-400">Aguardando Programação</h1>
+             <p className="mb-6 text-gray-400">
+               {state.isKiosk 
+                 ? "Este terminal ainda não possui uma playlist configurada ou atualizada." 
+                 : "Não foi possível carregar a playlist. Verifique as configurações."}
+             </p>
+             {/* No modo Kiosk, ocultamos o botão de voltar para manter o isolamento */}
+             {!state.isKiosk && (
+               <button onClick={exitPlayer} className="bg-blue-600 px-6 py-2 rounded hover:bg-blue-500 transition-colors">
+                 Voltar ao Painel
+               </button>
+             )}
+             {state.isKiosk && (
+                <div className="animate-pulse text-sm text-gray-500 mt-4">
+                    Aguarde, tentando reconectar...
+                </div>
+             )}
           </div>
         </div>
       );
@@ -114,13 +136,15 @@ const App: React.FC = () => {
 
   return (
     <div className="antialiased text-gray-900 bg-gray-100 min-h-screen">
-      {mode === 'dashboard' ? (
+      {/* Só renderiza o Dashboard se NÃO estiver em modo Player/Kiosk */}
+      {mode === 'dashboard' && !state.isKiosk ? (
         <Dashboard onStartPlayer={startPlayer} />
       ) : (
         <Player 
           playlist={state.activePlaylist!} 
           integrations={state.activeIntegrations}
-          onExit={exitPlayer} 
+          onExit={exitPlayer}
+          isKioskMode={state.isKiosk} // Passa a prop correta para o Player
         />
       )}
     </div>

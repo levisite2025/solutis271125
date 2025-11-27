@@ -8,9 +8,10 @@ interface PlayerProps {
   playlist: Playlist;
   integrations?: ApiIntegration[];
   onExit: () => void;
+  isKioskMode?: boolean;
 }
 
-const Player: React.FC<PlayerProps> = ({ playlist, integrations = [], onExit }) => {
+const Player: React.FC<PlayerProps> = ({ playlist, integrations = [], onExit, isKioskMode = false }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentItem, setCurrentItem] = useState<MediaItem>(playlist.items[0]);
   const [progress, setProgress] = useState(0);
@@ -315,9 +316,11 @@ const Player: React.FC<PlayerProps> = ({ playlist, integrations = [], onExit }) 
              }} className="text-white hover:text-blue-400">
                {isGlobalMuted ? <VolumeX /> : <Volume2 />}
              </button>
-             <button onClick={onExit} className="bg-white/20 hover:bg-white/40 text-white px-4 py-2 rounded backdrop-blur-sm">
-               Sair do Player
-             </button>
+             {!isKioskMode && (
+               <button onClick={onExit} className="bg-white/20 hover:bg-white/40 text-white px-4 py-2 rounded backdrop-blur-sm">
+                 Sair do Player
+               </button>
+             )}
            </div>
         </div>
       </div>
