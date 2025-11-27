@@ -9,7 +9,7 @@ import {
   Edit, Trash2, Image as ImageIcon, MessageSquare, 
   ArrowUp, ArrowDown, Save, Plus, Radio, Volume2,
   Globe, Rss, CloudSun, Coins, Ticket, Gauge, Share2, Copy, Link, X, Trophy, FastForward,
-  Bold, Palette, Type, PaintBucket, Wifi, PlugZap
+  Bold, Palette, Type, PaintBucket, Wifi, PlugZap, MapPin
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -729,7 +729,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
              </div>
           )}
 
-          {/* ... (Rest of component same as before) ... */}
           {/* === EDITOR VIEW === */}
           {activeTab === 'editor' && editingPlaylist && (
             <div className="flex h-full gap-6">
@@ -864,7 +863,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                         {getSelectedSlide()!.customOverlayText && (
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                              <div 
-                                className="p-8 rounded-xl max-w-4xl text-center whitespace-pre-line drop-shadow-lg"
+                                className="p-8 rounded-xl max-w-4xl text-center whitespace-pre-line drop-shadow-lg animate-slide-up"
+                                key={selectedSlideId} // Re-trigger animation on change
                                 style={{
                                     backgroundColor: getPreviewStyle(getSelectedSlide()!).backgroundColor
                                 }}
@@ -1328,13 +1328,19 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                 </div>
                 
                 <div className="space-y-6">
-                    <div>
-                        <label className="block text-xs uppercase font-bold text-gray-400 mb-2">Terminal Selecionado</label>
-                        <div className="bg-gray-900 p-3 rounded border border-gray-700">
-                            <div className="text-lg font-bold text-white">{sharingTerminal.name}</div>
-                            <div className="text-sm text-gray-500 flex items-center mt-1">
-                                <div className={`w-2 h-2 rounded-full mr-2 ${sharingTerminal.status === TerminalStatus.ONLINE ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                    <div className="bg-gray-900 p-4 rounded-lg border border-gray-700 flex items-center gap-4">
+                        <div className="p-3 bg-gray-800 rounded-full">
+                            <Monitor className="w-8 h-8 text-blue-500" />
+                        </div>
+                        <div>
+                            <h4 className="text-xl font-bold text-white leading-tight">{sharingTerminal.name}</h4>
+                            <div className="flex items-center text-gray-400 text-sm mt-1">
+                                <MapPin className="w-3 h-3 mr-1" />
                                 {sharingTerminal.location}
+                            </div>
+                            <div className="flex items-center gap-2 mt-2">
+                                 <span className={`w-2 h-2 rounded-full ${sharingTerminal.status === TerminalStatus.ONLINE ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                                 <span className="text-xs font-mono uppercase text-gray-500">{sharingTerminal.status}</span>
                             </div>
                         </div>
                     </div>
