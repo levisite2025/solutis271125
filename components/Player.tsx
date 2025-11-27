@@ -58,9 +58,9 @@ const Player: React.FC<PlayerProps> = ({ playlist, integrations = [], onExit }) 
     const weatherConfig = getIntegrationSettings(IntegrationType.WEATHER);
     const sportsConfig = getIntegrationSettings(IntegrationType.SPORTS);
 
-    let newsInterval: NodeJS.Timeout;
-    let weatherInterval: NodeJS.Timeout;
-    let sportsInterval: NodeJS.Timeout;
+    let newsInterval: ReturnType<typeof setInterval>;
+    let weatherInterval: ReturnType<typeof setInterval>;
+    let sportsInterval: ReturnType<typeof setInterval>;
 
     if (newsConfig && newsConfig.refreshInterval > 0) {
        newsInterval = setInterval(fetchNews, newsConfig.refreshInterval * 60 * 1000);
