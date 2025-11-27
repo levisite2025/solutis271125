@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Terminal, Playlist, MediaItem, TerminalStatus, MediaType, Schedule, ApiIntegration, IntegrationType, OverlayStyle } from '../types';
+import { Terminal, Playlist, MediaItem, TerminalStatus, MediaType, Schedule, ApiIntegration, IntegrationType, OverlayStyle, TransitionEffect } from '../types';
 import { MOCK_TERMINALS, MOCK_MEDIA_LIBRARY, MOCK_PLAYLIST, MOCK_INTEGRATIONS, BRAZIL_CITIES_BY_STATE } from '../constants';
 import { 
   Monitor, PlaySquare, BarChart3, Upload, 
@@ -9,7 +9,7 @@ import {
   Edit, Trash2, Image as ImageIcon, MessageSquare, 
   ArrowUp, ArrowDown, Save, Plus, Radio, Volume2,
   Globe, Rss, CloudSun, Coins, Ticket, Gauge, Share2, Copy, Link, X, Trophy, FastForward,
-  Bold, Palette, Type, PaintBucket, Wifi, PlugZap, MapPin
+  Bold, Palette, Type, PaintBucket, Wifi, PlugZap, MapPin, Menu, Shuffle, Search
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -23,6 +23,7 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'video/mp4'];
 
 const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
   const [activeTab, setActiveTab] = useState<'terminals' | 'media' | 'reports' | 'playlists' | 'editor' | 'integrations'>('terminals');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   // Helper to load from local storage or fallback to constants
   const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
@@ -51,9 +52,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
   const [selectedSlideId, setSelectedSlideId] = useState<string | null>(null);
   const [showPlaylistSettings, setShowPlaylistSettings] = useState(false); // Modal logic
+  const [showMediaPicker, setShowMediaPicker] = useState(false); // Media Picker Modal logic
 
   // Media Detail Modal State
   const [viewingMediaItem, setViewingMediaItem] = useState<MediaItem | null>(null);
+  const [mediaSearchTerm, setMediaSearchTerm] = useState('');
 
   // Terminal Sharing Modal State
   const [sharingTerminal, setSharingTerminal] = useState<Terminal | null>(null);
@@ -67,15 +70,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
   const [urlTestStatus, setUrlTestStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [urlTestMessage, setUrlTestMessage] = useState('');
 
-  // Weather Integration Local State
-  const [selectedState, setSelectedState] = useState<string>('');
-  const [selectedCity, setSelectedCity] = useState<string>('');
+  // Weather Integration Local State - Default to Salvador/BA
+  const [selectedState, setSelectedState] = useState<string>('BA');
+  const [selectedCity, setSelectedCity] = useState<string>('Salvador');
 
   // Upload State
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
+  const playlistAddInputRef = useRef<HTMLInputElement>(null);
 
   const statsData = [
     { name: '08:00', impressions: 400 },
@@ -131,7 +135,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
     }
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>, isBackgroundReplacement = false) => {
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>, isBackgroundReplacement = false, addToPlaylist = false) => {
     const file = event.target.files?.[0];
     setUploadError(null);
     setUploadSuccess(null);
@@ -177,7 +181,18 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
         audioEnabled: true
       };
       setMedia([newMediaItem, ...media]);
-      setUploadSuccess(`Upload de "${file.name}" concluído!`);
+      
+      if (addToPlaylist && editingPlaylist) {
+          // Add newly uploaded item to current playlist
+          const playlistItem = { ...newMediaItem, id: `pi_${Date.now()}` }; 
+          const updatedItems = [...editingPlaylist.items, playlistItem];
+          setEditingPlaylist({ ...editingPlaylist, items: updatedItems });
+          setSelectedSlideId(playlistItem.id);
+          setUploadSuccess(`"${file.name}" adicionado à playlist!`);
+          setShowMediaPicker(false);
+      } else {
+          setUploadSuccess(`Upload de "${file.name}" concluído!`);
+      }
     }
 
     setTimeout(() => setUploadSuccess(null), 3000);
@@ -190,6 +205,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
      if (playlist.items.length > 0) setSelectedSlideId(playlist.items[0].id);
      setActiveTab('editor');
      setShowPlaylistSettings(false);
+     setMobileMenuOpen(false); // Close menu if open
   };
 
   const handleSavePlaylist = () => {
@@ -290,8 +306,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
     }
     setShowIntegrationModal(false);
     setCurrentIntegration({});
-    setSelectedState('');
-    setSelectedCity('');
+    setSelectedState('BA');
+    setSelectedCity('Salvador');
   };
 
   const deleteIntegration = (id: string) => {
@@ -394,64 +410,78 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
      };
   };
 
+  const NavButton = ({ tab, icon: Icon, label }: { tab: any, icon: any, label: string }) => (
+    <button 
+      onClick={() => { setActiveTab(tab); setMobileMenuOpen(false); }} 
+      className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-gray-700'}`}
+    >
+      <Icon className="w-5 h-5 mr-3" /> {label}
+    </button>
+  );
+
   return (
-    <div className="flex h-screen bg-gray-900 text-gray-100 font-sans">
-      {/* Sidebar */}
-      <div className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
-        <div className="p-6 border-b border-gray-700">
-          <h1 className="text-2xl font-bold text-blue-500 flex items-center">
-            <Monitor className="mr-2" /> IndoorPro
-          </h1>
-          <p className="text-xs text-gray-400 mt-1">Gestão de Mídia Indoor</p>
+    <div className="flex h-screen bg-gray-900 text-gray-100 font-sans overflow-hidden">
+      
+      {/* Mobile Sidebar Overlay */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={() => setMobileMenuOpen(false)}></div>
+      )}
+
+      {/* Sidebar - Responsive */}
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-800 border-r border-gray-700 flex flex-col transform transition-transform duration-300 md:relative md:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="p-6 border-b border-gray-700 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-blue-500 flex items-center">
+              <Monitor className="mr-2" /> IndoorPro
+            </h1>
+            <p className="text-xs text-gray-400 mt-1">Gestão de Mídia Indoor</p>
+          </div>
+          <button className="md:hidden text-gray-400" onClick={() => setMobileMenuOpen(false)}>
+            <X className="w-6 h-6"/>
+          </button>
         </div>
-        <nav className="flex-1 p-4 space-y-2">
-          <button onClick={() => setActiveTab('terminals')} className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === 'terminals' ? 'bg-blue-600' : 'hover:bg-gray-700'}`}>
-            <Monitor className="w-5 h-5 mr-3" /> Terminais
-          </button>
-          <button onClick={() => setActiveTab('playlists')} className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === 'playlists' ? 'bg-blue-600' : 'hover:bg-gray-700'}`}>
-            <PlaySquare className="w-5 h-5 mr-3" /> Playlists
-          </button>
-          <button onClick={() => setActiveTab('media')} className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === 'media' ? 'bg-blue-600' : 'hover:bg-gray-700'}`}>
-            <Upload className="w-5 h-5 mr-3" /> Mídia
-          </button>
-          <button onClick={() => setActiveTab('integrations')} className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === 'integrations' ? 'bg-blue-600' : 'hover:bg-gray-700'}`}>
-            <Globe className="w-5 h-5 mr-3" /> Integrações
-          </button>
-          <button onClick={() => setActiveTab('reports')} className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === 'reports' ? 'bg-blue-600' : 'hover:bg-gray-700'}`}>
-            <BarChart3 className="w-5 h-5 mr-3" /> Relatórios
-          </button>
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          <NavButton tab="terminals" icon={Monitor} label="Terminais" />
+          <NavButton tab="playlists" icon={PlaySquare} label="Playlists" />
+          <NavButton tab="media" icon={Upload} label="Mídia" />
+          <NavButton tab="integrations" icon={Globe} label="Integrações" />
+          <NavButton tab="reports" icon={BarChart3} label="Relatórios" />
         </nav>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden flex flex-col bg-gray-900">
-        <header className="bg-gray-800 h-16 border-b border-gray-700 flex items-center justify-between px-8 flex-shrink-0">
+      <div className="flex-1 overflow-hidden flex flex-col bg-gray-900 w-full">
+        <header className="bg-gray-800 h-16 border-b border-gray-700 flex items-center justify-between px-4 md:px-8 flex-shrink-0">
           <div className="flex items-center">
+             <button className="mr-4 md:hidden text-gray-300 hover:text-white" onClick={() => setMobileMenuOpen(true)}>
+               <Menu className="w-6 h-6"/>
+             </button>
              {activeTab === 'editor' && (
                <button onClick={() => setActiveTab('playlists')} className="mr-4 hover:bg-gray-700 p-2 rounded-full text-gray-400 hover:text-white transition-colors">
                   <XCircle className="w-6 h-6"/>
                </button>
              )}
-             <h2 className="text-xl font-semibold capitalize">
+             <h2 className="text-lg md:text-xl font-semibold capitalize truncate">
                {activeTab === 'editor' ? 'Editor de Campanha' : activeTab}
              </h2>
           </div>
           
           {/* Status Message */}
           {(uploadError || uploadSuccess) && (
-            <div className={`px-4 py-2 rounded-lg flex items-center text-sm ${uploadError ? 'bg-red-900/50 text-red-200' : 'bg-green-900/50 text-green-200'}`}>
+            <div className={`px-4 py-2 rounded-lg flex items-center text-sm absolute top-20 right-4 z-50 md:static md:top-auto md:right-auto shadow-lg animate-fade-in ${uploadError ? 'bg-red-900 text-red-200' : 'bg-green-900 text-green-200'}`}>
               {uploadError ? <AlertCircle className="w-4 h-4 mr-2" /> : <CheckCircle className="w-4 h-4 mr-2" />}
               {uploadError || uploadSuccess}
             </div>
           )}
         </header>
 
-        <main className="flex-1 overflow-auto p-6 relative">
+        <main className="flex-1 overflow-auto p-4 md:p-6 relative">
           
-          {/* === INTEGRATIONS VIEW === */}
+          {/* ... (Integrations View) ... */}
           {activeTab === 'integrations' && (
              <div>
-                <div className="flex justify-between items-center mb-6">
+                {/* ... existing integrations content ... */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                    <div>
                       <h3 className="text-xl font-bold">Fontes de Dados (APIs)</h3>
                       <p className="text-sm text-gray-400">Configure notícias, clima, finanças e serviços externos.</p>
@@ -460,13 +490,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                       onClick={() => {
                         setCurrentIntegration({ type: IntegrationType.NEWS, refreshInterval: 15, animationSpeed: 20, enabled: true });
                         setShowIntegrationModal(true);
-                        // Reset validations
                         setUrlTestStatus('idle');
                         setUrlTestMessage('');
-                        setSelectedState('');
-                        setSelectedCity('');
+                        setSelectedState('BA');
+                        setSelectedCity('Salvador');
                       }}
-                      className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm font-bold flex items-center shadow-lg"
+                      className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm font-bold flex items-center shadow-lg w-full md:w-auto justify-center"
                    >
                       <Plus className="w-4 h-4 mr-2"/> Nova Integração
                    </button>
@@ -476,25 +505,35 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                    {integrations.map((api) => (
                       <div key={api.id} className={`bg-gray-800 rounded-xl border ${api.enabled ? 'border-gray-600' : 'border-red-900/50 opacity-70'} p-6 relative overflow-hidden group`}>
                          <div className="flex justify-between items-start mb-4">
-                            <div className="flex items-center">
-                               <div className="bg-gray-700 p-2 rounded-lg mr-3">
+                            <div className="flex items-center overflow-hidden">
+                               <div className="bg-gray-700 p-2 rounded-lg mr-3 flex-shrink-0">
                                   {getIntegrationIcon(api.type)}
                                </div>
-                               <div>
-                                  <h3 className="font-bold text-lg">{api.name}</h3>
-                                  <span className="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full">{api.provider}</span>
+                               <div className="min-w-0">
+                                  <h3 className="font-bold text-lg truncate">{api.name}</h3>
+                                  <span className="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full truncate block w-fit">{api.provider}</span>
                                </div>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 flex-shrink-0">
                                 <button 
                                   onClick={() => {
                                      setCurrentIntegration(api);
                                      setShowIntegrationModal(true);
-                                     // Reset validations
                                      setUrlTestStatus('idle');
                                      setUrlTestMessage('');
-                                     setSelectedState('');
-                                     setSelectedCity('');
+                                     let foundState = '';
+                                     let foundCity = '';
+                                     if (api.type === IntegrationType.WEATHER && api.endpointUrl) {
+                                         try {
+                                             const match = api.endpointUrl.match(/[?&]q=([^,]+),([A-Z]{2})/i);
+                                             if (match) {
+                                                 foundCity = decodeURIComponent(match[1]);
+                                                 foundState = match[2].toUpperCase();
+                                             }
+                                         } catch(e) { console.error(e); }
+                                     }
+                                     setSelectedState(foundState || 'BA');
+                                     setSelectedCity(foundCity || 'Salvador');
                                   }}
                                   className="p-1 hover:bg-blue-500/20 text-blue-400 rounded transition-colors"
                                 >
@@ -524,7 +563,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                             </div>
                             <div className={`flex items-center ${api.lastStatus === 'OK' ? 'text-green-500' : 'text-red-500'}`}>
                                {api.lastStatus === 'OK' ? <CheckCircle className="w-4 h-4 mr-1"/> : <AlertCircle className="w-4 h-4 mr-1"/>}
-                               {api.lastStatus === 'OK' ? 'Online' : 'Erro'}
+                               <span className="hidden sm:inline ml-1">{api.lastStatus === 'OK' ? 'Online' : 'Erro'}</span>
                             </div>
                          </div>
                       </div>
@@ -533,8 +572,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
 
                 {/* API Modal */}
                 {showIntegrationModal && (
-                   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-                      <div className="bg-gray-800 rounded-xl border border-gray-600 w-full max-w-lg shadow-2xl animate-slide-up overflow-hidden max-h-[90vh] overflow-y-auto">
+                   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                      <div className="bg-gray-800 rounded-xl border border-gray-600 w-full max-w-lg shadow-2xl animate-slide-up overflow-hidden max-h-[90vh] flex flex-col">
                          <div className="bg-gray-900 px-6 py-4 border-b border-gray-700 flex justify-between items-center">
                             <h3 className="text-lg font-bold flex items-center">
                                {currentIntegration.id ? <Settings className="mr-2 w-5 h-5"/> : <Plus className="mr-2 w-5 h-5"/>}
@@ -543,7 +582,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                             <button onClick={() => setShowIntegrationModal(false)}><XCircle className="text-gray-400 hover:text-white"/></button>
                          </div>
                          
-                         <div className="p-6 space-y-4">
+                         <div className="p-6 space-y-4 overflow-y-auto">
+                            {/* ... Modal content same as before ... */}
                             <div className="grid grid-cols-2 gap-4">
                                <div>
                                   <label className="block text-xs uppercase font-bold text-gray-400 mb-1">Nome</label>
@@ -563,8 +603,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                                          const newType = e.target.value as IntegrationType;
                                          setCurrentIntegration({...currentIntegration, type: newType});
                                          if(newType === IntegrationType.WEATHER) {
-                                             setSelectedState('');
-                                             setSelectedCity('');
+                                             setSelectedState('BA');
+                                             setSelectedCity('Salvador');
                                          }
                                      }}
                                   >
@@ -602,7 +642,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                                                 value={selectedState}
                                                 onChange={(e) => {
                                                     setSelectedState(e.target.value);
-                                                    setSelectedCity(''); // Reset city
+                                                    if (e.target.value === 'BA') setSelectedCity('Salvador');
+                                                    else setSelectedCity(''); 
                                                 }}
                                             >
                                                 <option value="">Selecione...</option>
@@ -657,7 +698,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                                       {isTestingUrl ? <RefreshCw className="w-4 h-4 animate-spin" /> : <PlugZap className="w-4 h-4" />}
                                    </button>
                                </div>
-                               {/* Validation Feedback */}
                                {urlTestMessage && (
                                    <div className={`text-[10px] mt-1 flex items-center ${urlTestStatus === 'success' ? 'text-green-400' : urlTestStatus === 'error' ? 'text-red-400' : 'text-gray-400'}`}>
                                        {urlTestStatus === 'success' && <CheckCircle className="w-3 h-3 mr-1" />}
@@ -731,11 +771,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
 
           {/* === EDITOR VIEW === */}
           {activeTab === 'editor' && editingPlaylist && (
-            <div className="flex h-full gap-6">
-              {/* Left: Settings & Slide List */}
-              <div className="w-80 flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row h-full gap-6">
+              {/* Left: Settings & Slide List (Stacks on Mobile) */}
+              <div className="w-full md:w-80 flex flex-col gap-4 flex-shrink-0 h-[40vh] md:h-auto">
                   {/* Playlist Global Settings Card */}
                   <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+                      {/* ... global settings content ... */}
                       <div className="flex justify-between items-center mb-3">
                           <h3 className="font-bold text-sm text-gray-300 uppercase">Configuração Global</h3>
                           <button onClick={() => setShowPlaylistSettings(!showPlaylistSettings)} className="text-blue-400 hover:text-blue-300">
@@ -750,7 +791,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                       {/* Settings Modal/Panel */}
                       {showPlaylistSettings && (
                           <div className="mt-4 pt-4 border-t border-gray-700 space-y-3 animate-fade-in">
-                              {/* ... (Existing global settings) ... */}
+                              {/* ... Existing global settings fields ... */}
                               <div>
                                   <label className="text-xs text-gray-500 uppercase font-bold">Nome da Playlist</label>
                                   <input 
@@ -796,12 +837,29 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                                       <span>Lento (60s)</span>
                                   </div>
                               </div>
+                              {/* Transition Effect Selection */}
+                              <div>
+                                  <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2"><Shuffle className="w-3 h-3"/> Efeito de Transição</label>
+                                  <select 
+                                      className="w-full bg-gray-900 border border-gray-600 rounded p-1 text-sm mt-1 focus:border-blue-500 outline-none"
+                                      value={editingPlaylist.transitionEffect || TransitionEffect.FADE}
+                                      onChange={(e) => updatePlaylistSettings('transitionEffect', e.target.value)}
+                                  >
+                                      <option value={TransitionEffect.FADE}>Suave (Fade)</option>
+                                      <option value={TransitionEffect.SLIDE_LEFT}>Deslizar (Esq)</option>
+                                      <option value={TransitionEffect.SLIDE_RIGHT}>Deslizar (Dir)</option>
+                                      <option value={TransitionEffect.SLIDE_UP}>Subir (Slide Up)</option>
+                                      <option value={TransitionEffect.ZOOM}>Zoom In</option>
+                                      <option value={TransitionEffect.ZOOM_OUT}>Zoom Out</option>
+                                      <option value={TransitionEffect.NONE}>Nenhum</option>
+                                  </select>
+                              </div>
                           </div>
                       )}
                   </div>
 
                   {/* Slides List */}
-                  <div className="bg-gray-800 rounded-xl border border-gray-700 flex flex-col flex-1 overflow-hidden">
+                  <div className="bg-gray-800 rounded-xl border border-gray-700 flex flex-col flex-1 overflow-hidden min-h-0">
                     <div className="p-4 border-b border-gray-700 font-bold flex justify-between items-center bg-gray-850">
                         <span>Slides ({editingPlaylist.items.length})</span>
                     </div>
@@ -832,7 +890,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                         ))}
                     </div>
                     <div className="p-4 border-t border-gray-700 space-y-2">
-                        <button className="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 rounded text-sm flex items-center justify-center">
+                        <button 
+                            onClick={() => setShowMediaPicker(true)}
+                            className="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 rounded text-sm flex items-center justify-center"
+                        >
                              <Plus className="w-4 h-4 mr-2"/> Adicionar Mídia
                         </button>
                         <div className="grid grid-cols-2 gap-2">
@@ -847,8 +908,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                   </div>
               </div>
 
-              {/* Right: Preview & Detail Editor */}
-              <div className="flex-1 bg-gray-800 rounded-xl border border-gray-700 flex flex-col overflow-hidden">
+              {/* ... (Right: Preview & Detail Editor same as before) ... */}
+              <div className="flex-1 bg-gray-800 rounded-xl border border-gray-700 flex flex-col overflow-hidden h-[60vh] md:h-auto">
                 {selectedSlideId && getSelectedSlide() ? (
                   <>
                      <div className="flex-1 bg-black relative flex items-center justify-center overflow-hidden group">
@@ -890,17 +951,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                      </div>
 
                      {/* Configuration Panel */}
-                     <div className="h-[45%] border-t border-gray-700 bg-gray-850 p-6 overflow-y-auto">
-                        <div className="flex items-center justify-between mb-6">
+                     <div className="h-1/2 md:h-[45%] border-t border-gray-700 bg-gray-850 p-4 md:p-6 overflow-y-auto">
+                        <div className="flex items-center justify-between mb-4 md:mb-6">
                             <h3 className="text-lg font-bold flex items-center text-white">
                                <Edit className="w-5 h-5 mr-2 text-blue-500" /> Editar Slide
                             </h3>
                             <span className="text-xs text-gray-500 uppercase tracking-wider">{getSelectedSlide()!.type} • ID: {getSelectedSlide()!.id}</span>
                         </div>
                         
-                        <div className="grid grid-cols-12 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                            {/* Visual Editing */}
-                           <div className="col-span-7 space-y-5">
+                           <div className="md:col-span-7 space-y-5">
                               <div>
                                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Papel de Parede (Background)</label>
                                  <div className="flex gap-3">
@@ -925,7 +986,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                                  ></textarea>
                                  
                                  {/* Formatting Toolbar */}
-                                 <div className="flex items-center gap-2 mt-2 bg-gray-800 p-2 rounded border border-gray-700">
+                                 <div className="flex flex-wrap items-center gap-2 mt-2 bg-gray-800 p-2 rounded border border-gray-700">
                                     <div className="flex items-center gap-1 group relative" title="Cor do Texto">
                                         <Palette className="w-4 h-4 text-gray-400" />
                                         <input 
@@ -977,7 +1038,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                            </div>
 
                            {/* Settings Column */}
-                           <div className="col-span-5 space-y-5">
+                           <div className="md:col-span-5 space-y-5">
                                <div>
                                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Mensagem Rodapé</label>
                                  <div className="flex items-center">
@@ -1038,7 +1099,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
             </div>
           )}
           
-          {/* ... (Terminals, Playlists, Media, Reports views same as before) ... */}
+          {/* ... (Rest of Terminals, Playlists, Media, Reports views same as before) ... */}
           {activeTab === 'terminals' && (
             <div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1046,6 +1107,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                   const plName = playlists.find(p => p.id === terminal.currentPlaylistId)?.name || 'Padrão';
                   return (
                     <div key={terminal.id} className="bg-gray-800 rounded-xl border border-gray-700 p-6 relative overflow-hidden shadow-lg hover:border-blue-500/50 transition-colors">
+                        {/* ... Terminal Card Content ... */}
                         <div className="flex justify-between items-start mb-4">
                         <div>
                             <h3 className="text-lg font-bold text-white">{terminal.name}</h3>
@@ -1112,12 +1174,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
           {/* ... (Other Tabs are kept same) ... */}
           {activeTab === 'playlists' && (
             <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                  <div>
                    <h3 className="text-xl font-bold">Listas de Reprodução</h3>
                    <p className="text-sm text-gray-400">Gerencie campanhas e agendamentos</p>
                  </div>
-                 <button className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm font-bold flex items-center">
+                 <button className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm font-bold flex items-center w-full md:w-auto justify-center">
                    <Plus className="w-4 h-4 mr-2"/> Nova Playlist
                  </button>
               </div>
@@ -1125,25 +1187,25 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
               <div className="grid gap-4">
                   {playlists.map((playlist) => (
                     <div key={playlist.id} className="border border-gray-600 rounded-lg overflow-hidden bg-gray-700/30">
-                        <div className="p-4 flex flex-wrap justify-between items-center border-b border-gray-600/50">
-                        <div className="flex items-center gap-4">
+                        <div className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-600/50 gap-4">
+                        <div className="flex items-start md:items-center gap-4 w-full">
                             <div>
                                 <h4 className="font-bold text-lg text-white">{playlist.name}</h4>
-                                <div className="flex items-center space-x-4 text-xs text-gray-400 mt-1">
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-400 mt-1">
                                     <span className="flex items-center"><Calendar className="w-3 h-3 mr-1"/> Seg-Sex</span>
                                     <span className="flex items-center"><Clock className="w-3 h-3 mr-1"/> {playlist.schedule.startTime} - {playlist.schedule.endTime}</span>
                                     {playlist.audioUrl && <span className="flex items-center text-green-400"><Radio className="w-3 h-3 mr-1"/> Rádio Online</span>}
                                 </div>
                             </div>
-                            <span className={`text-xs px-2 py-1 rounded border ${playlist.active ? 'bg-green-500/10 text-green-400 border-green-500/30' : 'bg-gray-500/10 text-gray-400 border-gray-600'}`}>
+                            <span className={`text-xs px-2 py-1 rounded border ml-auto md:ml-0 ${playlist.active ? 'bg-green-500/10 text-green-400 border-green-500/30' : 'bg-gray-500/10 text-gray-400 border-gray-600'}`}>
                                 {playlist.active ? 'Ativa' : 'Inativa'}
                             </span>
                         </div>
-                        <div className="flex gap-2 mt-2 sm:mt-0">
-                            <button onClick={() => openEditor(playlist)} className="flex items-center bg-gray-600 hover:bg-gray-500 text-white px-3 py-1.5 rounded text-sm transition-colors">
+                        <div className="flex gap-2 w-full md:w-auto">
+                            <button onClick={() => openEditor(playlist)} className="flex-1 md:flex-none items-center justify-center bg-gray-600 hover:bg-gray-500 text-white px-3 py-1.5 rounded text-sm transition-colors flex">
                                 <Edit className="w-4 h-4 mr-2"/> Editar
                             </button>
-                            <button onClick={() => onStartPlayer(playlist, integrations)} className="flex items-center bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/40 px-3 py-1.5 rounded text-sm transition-colors">
+                            <button onClick={() => onStartPlayer(playlist, integrations)} className="flex-1 md:flex-none items-center justify-center bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/40 px-3 py-1.5 rounded text-sm transition-colors flex">
                                 <PlaySquare className="w-4 h-4 mr-2"/> Preview
                             </button>
                         </div>
@@ -1169,12 +1231,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
           {/* ... (Media & Reports kept same) ... */}
           {activeTab === 'media' && (
             <div>
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                  <div>
                     <h3 className="text-xl font-bold">Biblioteca de Arquivos</h3>
                     <p className="text-sm text-gray-400">Arraste para playlists ou faça upload</p>
                  </div>
-                 <div>
+                 {/* Search Bar - NEW */}
+                 <div className="relative flex-1 max-w-md mx-4 hidden md:block">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <input
+                      type="text"
+                      placeholder="Buscar mídia..."
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-blue-500 outline-none text-gray-200"
+                      value={mediaSearchTerm}
+                      onChange={(e) => setMediaSearchTerm(e.target.value)}
+                    />
+                 </div>
+                 <div className="w-full md:w-auto">
                    <input 
                      type="file" 
                      ref={fileInputRef} 
@@ -1184,14 +1257,27 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                    />
                    <button 
                       onClick={() => fileInputRef.current?.click()}
-                      className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg flex items-center shadow-lg transition-transform active:scale-95"
+                      className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg flex items-center justify-center shadow-lg transition-transform active:scale-95 w-full md:w-auto"
                    >
                       <Upload className="w-4 h-4 mr-2" /> Upload Mídia
                    </button>
                  </div>
               </div>
+              
+              {/* Mobile Search Bar */}
+              <div className="relative mb-6 md:hidden">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Buscar mídia..."
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-blue-500 outline-none text-gray-200"
+                    value={mediaSearchTerm}
+                    onChange={(e) => setMediaSearchTerm(e.target.value)}
+                  />
+              </div>
+
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {media.map(item => (
+                {media.filter(item => item.title.toLowerCase().includes(mediaSearchTerm.toLowerCase())).map(item => (
                   <div 
                     key={item.id} 
                     onClick={() => setViewingMediaItem(item)}
@@ -1264,7 +1350,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
       {/* Media Detail Modal */}
       {viewingMediaItem && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 md:p-6"
           onClick={() => setViewingMediaItem(null)}
         >
            <div 
@@ -1279,15 +1365,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                  <button onClick={() => setViewingMediaItem(null)} className="text-gray-400 hover:text-white"><X className="w-6 h-6"/></button>
               </div>
               
-              <div className="flex-1 bg-black flex items-center justify-center p-4 min-h-[400px]">
+              <div className="flex-1 bg-black flex items-center justify-center p-4 min-h-[300px] md:min-h-[400px]">
                  {viewingMediaItem.type === MediaType.VIDEO ? (
-                    <video src={viewingMediaItem.url} controls className="max-w-full max-h-[60vh] rounded" />
+                    <video src={viewingMediaItem.url} controls className="max-w-full max-h-[50vh] md:max-h-[60vh] rounded" />
                  ) : (
-                    <img src={viewingMediaItem.url} alt={viewingMediaItem.title} className="max-w-full max-h-[60vh] rounded shadow-lg" />
+                    <img src={viewingMediaItem.url} alt={viewingMediaItem.title} className="max-w-full max-h-[50vh] md:max-h-[60vh] rounded shadow-lg" />
                  )}
               </div>
 
-              <div className="p-6 bg-gray-850 border-t border-gray-700 flex justify-between items-center">
+              <div className="p-4 md:p-6 bg-gray-850 border-t border-gray-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div className="space-y-1 text-sm text-gray-400">
                       <p><span className="font-bold uppercase text-gray-500">ID:</span> {viewingMediaItem.id}</p>
                       <p><span className="font-bold uppercase text-gray-500">Duração:</span> {viewingMediaItem.duration} segundos</p>
@@ -1296,10 +1382,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                       )}
                   </div>
                   
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 w-full md:w-auto">
                      <button 
                         onClick={() => handleShareMedia(viewingMediaItem)}
-                        className="flex items-center bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold shadow-lg transition-colors"
+                        className="flex items-center justify-center bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold shadow-lg transition-colors w-full md:w-auto"
                      >
                         {navigator.share ? <Share2 className="w-4 h-4 mr-2"/> : <Link className="w-4 h-4 mr-2"/>}
                         {navigator.share ? 'Compartilhar' : 'Copiar Link'}
@@ -1358,7 +1444,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                             />
                             <button 
                                 onClick={() => copyToClipboard(getTerminalLink(sharingTerminal), 'Link')}
-                                className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded transition-colors shadow-lg active:scale-95"
+                                className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded transition-colors shadow-lg active:scale-95 flex-shrink-0"
                                 title="Copiar Link"
                             >
                                 <Copy className="w-4 h-4"/>
@@ -1380,7 +1466,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                             />
                             <button 
                                 onClick={() => copyToClipboard(sharingTerminal.ipAddress, 'IP')}
-                                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded transition-colors border border-gray-600 active:scale-95"
+                                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded transition-colors border border-gray-600 active:scale-95 flex-shrink-0"
                                 title="Copiar IP"
                             >
                                 <Copy className="w-4 h-4"/>
@@ -1392,6 +1478,70 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartPlayer }) => {
                 
                 <div className="mt-6 pt-4 border-t border-gray-700 flex justify-end">
                     <button onClick={() => setSharingTerminal(null)} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm text-white">Fechar</button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Media Picker Modal */}
+      {showMediaPicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="bg-gray-800 rounded-xl border border-gray-700 w-full max-w-4xl max-h-[80vh] flex flex-col shadow-2xl animate-fade-in">
+                <div className="flex justify-between items-center p-4 border-b border-gray-700 bg-gray-900">
+                    <h3 className="font-bold text-lg text-white flex items-center">
+                        <Plus className="mr-2 text-blue-500"/> Adicionar à Playlist
+                    </h3>
+                    <button onClick={() => setShowMediaPicker(false)}><X className="text-gray-400 hover:text-white"/></button>
+                </div>
+                
+                <div className="p-4 overflow-y-auto grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {/* Upload New File - Direct to Playlist */}
+                    <div 
+                        onClick={() => playlistAddInputRef.current?.click()}
+                        className="bg-gray-700/50 border-2 border-dashed border-gray-600 rounded-lg flex flex-col items-center justify-center p-4 cursor-pointer hover:border-blue-500 hover:bg-gray-700 transition-colors aspect-video"
+                    >
+                        <input 
+                            type="file" 
+                            ref={playlistAddInputRef} 
+                            className="hidden"
+                            accept=".jpg,.jpeg,.png,.mp4"
+                            onChange={(e) => handleFileSelect(e, false, true)} 
+                        />
+                        <Upload className="w-8 h-8 text-gray-400 mb-2"/>
+                        <span className="text-xs text-gray-300 font-bold">Fazer Upload</span>
+                    </div>
+
+                    {media.map(item => (
+                        <div 
+                            key={item.id} 
+                            onClick={() => {
+                                if (!editingPlaylist) return;
+                                // Create unique ID for playlist item to allow duplicate additions
+                                const newItem = { ...item, id: `pi_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` };
+                                const updatedItems = [...editingPlaylist.items, newItem];
+                                setEditingPlaylist({...editingPlaylist, items: updatedItems});
+                                setSelectedSlideId(newItem.id);
+                                setShowMediaPicker(false);
+                            }}
+                            className="bg-gray-700 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all group relative border border-gray-600"
+                        >
+                            <div className="relative aspect-video bg-black">
+                                <img src={item.thumbnail} alt={item.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100" />
+                                <div className="absolute top-1 right-1 bg-black/60 px-1.5 rounded text-[10px] text-white font-bold">
+                                    {item.duration}s
+                                </div>
+                                <div className="absolute inset-0 bg-blue-600/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <Plus className="text-white w-8 h-8 drop-shadow-md" />
+                                </div>
+                            </div>
+                            <div className="p-2">
+                                <div className="text-xs font-medium text-white truncate" title={item.title}>{item.title}</div>
+                                <div className="text-[10px] text-gray-400 mt-1 flex justify-between items-center">
+                                    <span>{item.type === MediaType.VIDEO ? 'VIDEO' : item.type === MediaType.IMAGE ? 'IMG' : 'WIDGET'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
         </div>

@@ -1,4 +1,5 @@
 
+
 export enum MediaType {
   IMAGE = 'IMAGE',
   VIDEO = 'VIDEO',
@@ -22,6 +23,16 @@ export enum IntegrationType {
   LOTTERY = 'LOTTERY',
   SPORTS = 'SPORTS',
   OTHER = 'OTHER'
+}
+
+export enum TransitionEffect {
+  FADE = 'FADE',
+  SLIDE_LEFT = 'SLIDE_LEFT',
+  SLIDE_RIGHT = 'SLIDE_RIGHT',
+  SLIDE_UP = 'SLIDE_UP',
+  ZOOM = 'ZOOM',
+  ZOOM_OUT = 'ZOOM_OUT',
+  NONE = 'NONE'
 }
 
 export interface ApiIntegration {
@@ -74,6 +85,7 @@ export interface Playlist {
   audioUrl?: string; // Background radio
   tickerSpeed?: number; // Animation duration in seconds (10 = Fast, 60 = Slow)
   active: boolean;
+  transitionEffect?: TransitionEffect;
 }
 
 export interface Terminal {
